@@ -1,0 +1,18 @@
+<idea-plugin>
+    <id>com.linuxgods.kreiger.idea.statusbar.filename</id>
+    <name>Status Bar File Name &amp; Recent Files</name>
+    <vendor email="christoffer.hammarstrom@linuxgods.com" url="https://github.com/kreiger/intellij-idea-statusbar-filename">Christoffer Hammarström</vendor>
+
+    <idea-version since-build="211" />
+
+    <description><![CDATA[
+    Shows the file name of the currently open file in the status bar. Clicking shows a list of recent files.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <statusBarWidgetFactory implementation="com.linuxgods.kreiger.idea.FileNameStatusBarWidgetFactory" order="before positionWidget"/>
+    </extensions>
+
+</idea-plugin>
