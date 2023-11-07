@@ -1,129 +1,111 @@
 package com.linuxgods.kreiger.idea;
 
 import com.intellij.ide.IdeBundle;
+import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.fileEditor.FileEditorManager;
-import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
-import com.intellij.openapi.fileEditor.impl.EditorTabPresentationUtil;
-import com.intellij.openapi.fileEditor.impl.FileEditorManagerImpl;
-import com.intellij.openapi.project.DumbService;
+import com.intellij.openapi.fileEditor.impl.EditorHistoryManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.popup.ListPopup;
+import com.intellij.openapi.ui.popup.ListSeparator;
 import com.intellij.openapi.ui.popup.PopupStep;
 import com.intellij.openapi.ui.popup.util.BaseListPopupStep;
-import com.intellij.openapi.util.NlsContexts;
+import com.intellij.openapi.util.Iconable;
+import com.intellij.openapi.vcs.FileStatusManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.newvfs.VfsPresentationUtil;
 import com.intellij.openapi.wm.StatusBar;
 import com.intellij.openapi.wm.StatusBarWidget;
-import com.intellij.openapi.wm.impl.status.EditorBasedWidget;
+import com.intellij.openapi.wm.impl.status.EditorBasedStatusBarPopup;
 import com.intellij.ui.popup.list.ListPopupImpl;
-import com.intellij.util.Consumer;
 import com.intellij.util.IconUtil;
-import com.intellij.util.SlowOperations;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
-import java.awt.event.MouseEvent;
-import java.util.Collections;
+import java.awt.*;
 import java.util.List;
 
-import static java.util.stream.Collectors.toList;
-
-class FileNameStatusBarWidget extends EditorBasedWidget implements StatusBarWidget.MultipleTextValuesPresentation {
+class FileNameStatusBarWidget extends EditorBasedStatusBarPopup {
     private String text;
     private Icon icon;
 
     public FileNameStatusBarWidget(@NotNull Project project) {
-        super(project);
-    }
-
-    @Override public void dispose() {
-        super.dispose();
+        super(project, false);
     }
 
     @Override public @NonNls @NotNull String ID() {
         return "Filename";
     }
 
-    @Override public @Nullable WidgetPresentation getPresentation() {
-        return this;
-    }
-
-    @Override public @Nullable @NlsContexts.Tooltip String getTooltipText() {
-        return null;
-    }
-
-    @Override public @Nullable Consumer<MouseEvent> getClickConsumer() {
-        return null;
-    }
-
     @Override public void install(@NotNull StatusBar statusBar) {
         super.install(statusBar);
-        DumbService.getInstance(myProject).runWhenSmart(() -> update(getSelectedFile()));
     }
 
-    @Override public void selectionChanged(@NotNull FileEditorManagerEvent event) {
-        update(event.getNewFile());
+    @Override public void handleFileChange(VirtualFile file) {
+        update(file);
     }
-
 
     private void update(VirtualFile file) {
         if (null == file) return;
         text = getFileTitle(file);
-        icon = IconUtil.getIcon(file, 0, myProject);
-        myStatusBar.updateWidget(ID());
+        icon = IconUtil.computeFileIcon(file, 0, getProject());
     }
 
     private String getFileTitle(VirtualFile file) {
-        return SlowOperations.allowSlowOperations(() -> VfsPresentationUtil.getUniquePresentableNameForUI(myProject, file));
+        return VfsPresentationUtil.getUniquePresentableNameForUI(getProject(), file);
     }
 
-    @Override public @Nullable("null means the widget is unable to show the popup") ListPopup getPopupStep() {
-        return new ListPopupImpl(myProject, new RecentFilesPopupStep(myProject));
+    @NotNull @Override protected StatusBarWidget createInstance(@NotNull Project project) {
+        return new FileNameStatusBarWidget(project);
     }
 
-    @Override public @Nullable @NlsContexts.StatusBarText String getSelectedValue() {
-        return text;
+    @Nullable @Override protected ListPopup createPopup(@NotNull DataContext dataContext) {
+        List<VirtualFile> recentFiles = EditorHistoryManager.getInstance(getProject()).getFileList();
+        if (recentFiles.isEmpty()) return null;
+        return new ListPopupImpl(getProject(), new RecentFilesPopupStep(recentFiles));
     }
 
-    @Override public @Nullable Icon getIcon() {
-        return icon;
-    }
-
-    private static List<VirtualFile> getSelectionHistory(FileEditorManagerImpl fileEditorManager) {
-        List<VirtualFile> selectionHistory = fileEditorManager.getSelectionHistory().stream()
-                .map(pair -> pair.getFirst())
-                .collect(toList());
-        Collections.reverse(selectionHistory);
-        return selectionHistory;
+    @NotNull @Override protected WidgetState getWidgetState(@Nullable VirtualFile file) {
+        if (file == null) return WidgetState.HIDDEN;
+        WidgetState widgetState = new WidgetState(text, text, true);
+        widgetState.setIcon(icon);
+        return widgetState;
     }
 
     private class RecentFilesPopupStep extends BaseListPopupStep<VirtualFile> {
-        private final FileEditorManager fileEditorManager;
-
-        public RecentFilesPopupStep(Project project) {
-            this((FileEditorManagerImpl) FileEditorManagerImpl.getInstance(project));
-        }
-
-        private RecentFilesPopupStep(FileEditorManagerImpl fileEditorManager) {
-            super(IdeBundle.message("title.popup.recent.files"), getSelectionHistory(fileEditorManager));
-            this.fileEditorManager = fileEditorManager;
+        public RecentFilesPopupStep(List<VirtualFile> files) {
+            super(IdeBundle.message("title.popup.recent.files"), files);
+            setDefaultOptionIndex(files.size() - 1);
         }
 
         @Override public Icon getIconFor(VirtualFile file) {
-            return IconUtil.getIcon(file, 0, myProject);
+            if (file == null) return null;
+            return IconUtil.getIcon(file, Iconable.ICON_FLAG_READ_STATUS, getProject());
+        }
+
+        @Override public @Nullable Color getForegroundFor(VirtualFile file) {
+            if (file == null) return null;
+            return FileStatusManager.getInstance(getProject()).getStatus(file).getColor();
         }
 
         @Override public @NotNull String getTextFor(VirtualFile file) {
+            if (file == null) return "";
             return getFileTitle(file);
         }
 
         @Override
         public @Nullable PopupStep<?> onChosen(VirtualFile file, boolean finalChoice) {
-            fileEditorManager.openFile(file, true);
+            if (file != null && finalChoice) FileEditorManager.getInstance(getProject()).openFile(file, true);
             return FINAL_CHOICE;
+        }
+
+        @Override public @Nullable ListSeparator getSeparatorAbove(VirtualFile value) {
+            List<VirtualFile> values = getValues();
+            if (values.isEmpty()) return null;
+            VirtualFile mostRecentFile = values.get(values.size() - 1);
+            if (!value.equals(mostRecentFile)) return null;
+            return new ListSeparator(IdeBundle.message("scope.current.file"));
         }
     }
 }
