@@ -2,7 +2,6 @@
     <id>com.linuxgods.kreiger.idea.statusbar.filename</id>
     <name>Status Bar File Name &amp; Recent Files</name>
     <vendor email="christoffer.hammarstrom@linuxgods.com" url="https://github.com/kreiger/intellij-idea-statusbar-filename">Christoffer Hammarström</vendor>
-    <version>1.2</version>
 
     <idea-version since-build="233" />
 

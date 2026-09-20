@@ -1,6 +1,5 @@
 package com.linuxgods.kreiger.idea;
 
-import com.intellij.ide.IdeBundle;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
@@ -33,8 +32,8 @@ import java.util.List;
 
 class FileNameStatusBarWidget extends EditorBasedStatusBarPopup {
     private static final Key<String> UNIQUE_PRESENTABLE_NAME_FOR_UI = Key.create("PRESENTABLE_NAME_FOR_UI");
-    public static final @NotNull
-    @Nls String RECENT_FILES = IdeBundle.message("title.popup.recent.files");
+    public static final @Nls String RECENT_FILES = "Recent Files";
+    public static final @Nls String CURRENT_FILE = "Current File";
 
     public FileNameStatusBarWidget(@NotNull Project project) {
         super(project, false);
@@ -51,7 +50,7 @@ class FileNameStatusBarWidget extends EditorBasedStatusBarPopup {
     @Override public void handleFileChange(VirtualFile file) {
         if (null == file) return;
         ApplicationManager.getApplication().executeOnPooledThread(() ->
-                ReadAction.run(() ->
+                ReadAction.nonBlocking(() ->
                         cacheFileTitle(file)));
     }
 
@@ -122,7 +121,7 @@ class FileNameStatusBarWidget extends EditorBasedStatusBarPopup {
             if (values.isEmpty()) return null;
             VirtualFile mostRecentFile = values.get(values.size() - 1);
             if (!value.equals(mostRecentFile)) return null;
-            return new ListSeparator(IdeBundle.message("scope.current.file"));
+            return new ListSeparator(CURRENT_FILE);
         }
     }
 }
