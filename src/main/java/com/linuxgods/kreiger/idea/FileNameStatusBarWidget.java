@@ -2,6 +2,8 @@ package com.linuxgods.kreiger.idea;
 
 import com.intellij.ide.IdeBundle;
 import com.intellij.openapi.actionSystem.DataContext;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.impl.EditorHistoryManager;
 import com.intellij.openapi.project.Project;
@@ -10,6 +12,7 @@ import com.intellij.openapi.ui.popup.ListSeparator;
 import com.intellij.openapi.ui.popup.PopupStep;
 import com.intellij.openapi.ui.popup.util.BaseListPopupStep;
 import com.intellij.openapi.util.Iconable;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vcs.FileStatusManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.newvfs.VfsPresentationUtil;
@@ -18,6 +21,8 @@ import com.intellij.openapi.wm.StatusBarWidget;
 import com.intellij.openapi.wm.impl.status.EditorBasedStatusBarPopup;
 import com.intellij.ui.popup.list.ListPopupImpl;
 import com.intellij.util.IconUtil;
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread;
+import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -27,8 +32,9 @@ import java.awt.*;
 import java.util.List;
 
 class FileNameStatusBarWidget extends EditorBasedStatusBarPopup {
-    private String text;
-    private Icon icon;
+    private static final Key<String> UNIQUE_PRESENTABLE_NAME_FOR_UI = Key.create("PRESENTABLE_NAME_FOR_UI");
+    public static final @NotNull
+    @Nls String RECENT_FILES = IdeBundle.message("title.popup.recent.files");
 
     public FileNameStatusBarWidget(@NotNull Project project) {
         super(project, false);
@@ -43,15 +49,13 @@ class FileNameStatusBarWidget extends EditorBasedStatusBarPopup {
     }
 
     @Override public void handleFileChange(VirtualFile file) {
-        update(file);
-    }
-
-    private void update(VirtualFile file) {
         if (null == file) return;
-        text = getFileTitle(file);
-        icon = IconUtil.computeFileIcon(file, 0, getProject());
+        ApplicationManager.getApplication().executeOnPooledThread(() ->
+                ReadAction.run(() ->
+                        cacheFileTitle(file)));
     }
 
+    @RequiresBackgroundThread
     private String getFileTitle(VirtualFile file) {
         return VfsPresentationUtil.getUniquePresentableNameForUI(getProject(), file);
     }
@@ -68,14 +72,26 @@ class FileNameStatusBarWidget extends EditorBasedStatusBarPopup {
 
     @NotNull @Override protected WidgetState getWidgetState(@Nullable VirtualFile file) {
         if (file == null) return WidgetState.HIDDEN;
-        WidgetState widgetState = new WidgetState(text, text, true);
+        String title = cacheFileTitle(file);
+        Icon icon = IconUtil.computeFileIcon(file, 0, getProject());
+        WidgetState widgetState = new WidgetState(RECENT_FILES, title, true);
         widgetState.setIcon(icon);
         return widgetState;
     }
 
+    private @NotNull String cacheFileTitle(@NotNull VirtualFile file) {
+        String title = getFileTitle(file);
+        String saved = file.getUserData(UNIQUE_PRESENTABLE_NAME_FOR_UI);
+        if (!title.equals(saved)) {
+            file.putUserData(UNIQUE_PRESENTABLE_NAME_FOR_UI, title);
+        }
+        return title;
+    }
+
     private class RecentFilesPopupStep extends BaseListPopupStep<VirtualFile> {
+
         public RecentFilesPopupStep(List<VirtualFile> files) {
-            super(IdeBundle.message("title.popup.recent.files"), files);
+            super(RECENT_FILES, files);
             setDefaultOptionIndex(files.size() - 1);
         }
 
@@ -91,7 +107,8 @@ class FileNameStatusBarWidget extends EditorBasedStatusBarPopup {
 
         @Override public @NotNull String getTextFor(VirtualFile file) {
             if (file == null) return "";
-            return getFileTitle(file);
+            String uniquePresentableNameForUI = file.getUserData(UNIQUE_PRESENTABLE_NAME_FOR_UI);
+            return uniquePresentableNameForUI != null ? uniquePresentableNameForUI : file.getPresentableName();
         }
 
         @Override

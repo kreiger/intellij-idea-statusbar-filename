@@ -1,16 +1,25 @@
 plugins {
-    id 'org.jetbrains.intellij' version '1.16.0'
+    id "org.jetbrains.intellij.platform" version "2.19.0"
     id 'java'
 }
 
 group 'com.linuxgods.kreiger.idea'
-version '1.1'
+version '1.2'
 
 repositories {
     mavenCentral()
+    intellijPlatform {
+        defaultRepositories()
+    }
 }
 
-intellij {
-    version = '2022.3'
-    updateSinceUntilBuild = false
+dependencies {
+    intellijPlatform {
+        intellijIdea "2023.3"
+    }
+}
+
+intellijPlatformTesting.runIde.register("runLatestIde") {
+    type = org.jetbrains.intellij.platform.gradle.IntelliJPlatformType.IntellijIdea
+    version = "latest"
 }

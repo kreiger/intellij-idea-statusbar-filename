@@ -2,8 +2,9 @@
     <id>com.linuxgods.kreiger.idea.statusbar.filename</id>
     <name>Status Bar File Name &amp; Recent Files</name>
     <vendor email="christoffer.hammarstrom@linuxgods.com" url="https://github.com/kreiger/intellij-idea-statusbar-filename">Christoffer Hammarström</vendor>
+    <version>1.2</version>
 
-    <idea-version since-build="223" />
+    <idea-version since-build="233" />
 
     <description><![CDATA[
     Shows the file name of the currently open file in the status bar. Clicking shows a list of recent files.
@@ -11,7 +12,7 @@
 
     <change-notes><![CDATA[
         <ul>
-            <li>Updated for IntelliJ 2022.3 and later, tested with IntelliJ IDEA 2023.2</li>
+            <li>Updated for IntelliJ 2023.3 and later, tested with IntelliJ IDEA 2026.2.3</li>
         </ul>
     ]]></change-notes>
 
